@@ -1,0 +1,50 @@
+# Builds the Windows .exe and the Mac .dmg on GitHub's own computers.
+# Runs on every push to main, and can be started by hand from the Actions tab
+# ("Build apps" -> "Run workflow"). The finished files appear at the bottom of
+# the run's page under "Artifacts".
+name: Build apps
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist
+            files: dist/*.exe
+            name: FishAgeReader-Windows
+          - os: macos-latest
+            script: dist:mac
+            files: dist/*.dmg
+            name: FishAgeReader-Mac
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test results-file logic
+        run: npm test
+
+      - name: Build app
+        run: npm run ${{ matrix.script }}
+
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+          retention-days: 90

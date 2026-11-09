@@ -1,0 +1,47 @@
+{
+  "name": "fish-age-reader",
+  "productName": "Fish Age Reader",
+  "version": "1.1.0",
+  "description": "Blind, randomized age reading of fish scale and otolith images",
+  "main": "main.js",
+  "author": "Fish Age Reader",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/csv.test.js",
+    "dist": "electron-builder --win portable --publish never",
+    "dist:mac": "electron-builder --mac dmg --universal --publish never"
+  },
+  "build": {
+    "appId": "org.fishagereader.app",
+    "productName": "Fish Age Reader",
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*"
+    ],
+    "win": {
+      "target": "portable"
+    },
+    "portable": {
+      "artifactName": "FishAgeReader-${version}-portable.exe"
+    },
+    "mac": {
+      "category": "public.app-category.education",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "artifactName": "FishAgeReader-${version}-mac.dmg"
+    }
+  },
+  "devDependencies": {
+    "electron": "^38.8.6",
+    "electron-builder": "^26.18.0",
+    "playwright-core": "^1.65.0"
+  },
+  "dependencies": {
+    "utif": "^3.1.0"
+  }
+}

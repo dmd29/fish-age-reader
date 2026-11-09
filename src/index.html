@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>Fish Age Reader</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============ START SCREEN ============ -->
+<section id="screen-start" class="screen active">
+  <div class="start-card">
+    <h1>Fish Age Reader</h1>
+    <p class="muted">Blind, randomized age readings of scales and otoliths.</p>
+
+    <div class="step">
+      <h2><span class="num">1</span> Who is reading?</h2>
+      <div id="profile-list" class="profile-list" role="radiogroup" aria-label="Observer"></div>
+      <form id="add-profile-form" class="inline-form">
+        <input id="new-profile" type="text" placeholder="New observer name (e.g. Obs 4)" maxlength="40" autocomplete="off">
+        <button type="submit" class="btn">Add observer</button>
+      </form>
+    </div>
+
+    <div class="step">
+      <h2><span class="num">2</span> Image folder</h2>
+      <div class="inline-form">
+        <button id="pick-folder" class="btn">Choose folder…</button>
+        <span id="folder-name" class="muted">No folder selected</span>
+      </div>
+      <div id="folder-summary" class="summary hidden"></div>
+      <div id="new-file-options" class="option-row hidden">
+        <label for="delimiter">Separator for the new results file:</label>
+        <select id="delimiter">
+          <option value=",">Comma ( , ) — standard CSV</option>
+          <option value=";">Semicolon ( ; ) — Excel in Portuguese / European settings</option>
+        </select>
+      </div>
+      <label id="reread-row" class="option-row check hidden">
+        <input id="reread" type="checkbox">
+        Re-read images I already aged (my previous values will be replaced)
+      </label>
+    </div>
+
+    <button id="start-btn" class="btn primary big" disabled>Start reading</button>
+    <p id="start-hint" class="muted small">Choose an observer and a folder to begin.</p>
+  </div>
+</section>
+
+<!-- ============ READING SCREEN ============ -->
+<section id="screen-read" class="screen">
+  <header class="topbar">
+    <div class="brand">Fish Age Reader</div>
+    <div class="chip" id="observer-chip"></div>
+    <div class="progress-wrap">
+      <div class="progress-text" id="progress-text"></div>
+      <div class="progress"><div id="progress-bar"></div></div>
+    </div>
+    <div class="spacer"></div>
+    <span id="save-state" class="muted small"></span>
+    <button id="save-results" class="btn primary" title="Save results (Ctrl+S)">Save results</button>
+    <button id="exit-btn" class="btn ghost" title="Back to start screen">Exit</button>
+  </header>
+
+  <div class="workspace">
+    <nav class="toolbar" aria-label="Tools">
+      <button class="tool active" data-tool="pan" title="Move / pan (H)">
+        <svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20M12 2l-3 3M12 2l3 3M12 22l-3-3M12 22l3-3M2 12l3-3M2 12l3 3M22 12l-3-3M22 12l-3 3"/></svg>
+        <span>Move</span>
+      </button>
+      <button class="tool" data-tool="free" title="Freehand draw (F)">
+        <svg viewBox="0 0 24 24"><path d="M3 21l3.5-1 12-12-2.5-2.5-12 12L3 21zM14.5 5.5l2.5 2.5"/></svg>
+        <span>Draw</span>
+      </button>
+      <button class="tool" data-tool="line" title="Straight line - shows length in pixels (L)">
+        <svg viewBox="0 0 24 24"><path d="M4 20L20 4"/><circle cx="4" cy="20" r="2"/><circle cx="20" cy="4" r="2"/></svg>
+        <span>Line</span>
+      </button>
+      <button class="tool" data-tool="point" title="Numbered point - e.g. mark each annulus (P)">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+        <span>Point</span>
+      </button>
+      <button class="tool" data-tool="scale" title="Set scale: draw a line along the scale bar on the photo, then type its real length (S)">
+        <svg viewBox="0 0 24 24"><path d="M2 15h20v4H2zM6 15v2M10 15v2.5M14 15v2M18 15v2.5M4 10h16M4 10l2-2M4 10l2 2M20 10l-2-2M20 10l-2 2"/></svg>
+        <span>Scale</span>
+      </button>
+
+      <div class="tool-sep"></div>
+      <div class="swatches" id="swatches" aria-label="Colour"></div>
+      <label class="width-ctl" title="Line / point size">
+        <span>Size</span>
+        <input id="stroke-width" type="range" min="1" max="14" value="3">
+      </label>
+
+      <div class="tool-sep"></div>
+      <button class="tool" id="undo-btn" title="Undo last mark (Ctrl+Z)">
+        <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg>
+        <span>Undo</span>
+      </button>
+      <button class="tool" id="clear-btn" title="Remove all marks on this image">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+        <span>Clear</span>
+      </button>
+    </nav>
+
+    <main class="stage" id="stage">
+      <canvas id="canvas"></canvas>
+      <div class="loading hidden" id="loading">Loading image…</div>
+      <div class="zoombar">
+        <button class="btn ghost sm" id="zoom-out" title="Zoom out (-)">−</button>
+        <span id="zoom-level">100%</span>
+        <button class="btn ghost sm" id="zoom-in" title="Zoom in (+)">+</button>
+        <button class="btn ghost sm" id="zoom-fit" title="Fit to window (0)">Fit</button>
+        <button class="btn ghost sm" id="zoom-100" title="Actual pixels (1)">1:1</button>
+      </div>
+      <div class="hint-bar muted small">Scroll to zoom · drag with right mouse button (or hold Space) to move in any tool</div>
+    </main>
+
+    <aside class="panel">
+      <div class="panel-block">
+        <div class="muted small">Current image</div>
+        <div class="image-code" id="image-code">Image 1</div>
+        <div class="muted small">File names are hidden during reading.</div>
+      </div>
+
+      <form id="age-form" class="panel-block" autocomplete="off">
+        <label for="age-input" class="age-label">Your age assessment</label>
+        <input id="age-input" type="text" inputmode="numeric" placeholder="e.g. 4" maxlength="12">
+        <div class="field-msg" id="age-msg"></div>
+        <button type="submit" class="btn primary block" id="submit-age">Save age &amp; next ⏎</button>
+        <button type="button" class="btn block" id="skip-btn">Skip this image →</button>
+        <button type="button" class="btn ghost block" id="prev-btn">← Previous image</button>
+      </form>
+
+      <div class="panel-block">
+        <div class="block-title">Scale &amp; measurements</div>
+        <div id="scale-status" class="scale-status muted small">No scale set</div>
+        <button type="button" class="btn ghost sm hidden" id="scale-image-remove" title="Stop using this image's own scale and use the folder scale">Use folder scale for this image</button>
+        <ol id="measure-list" class="measure-list"></ol>
+        <div class="muted small" id="measure-empty">Use the Line tool to measure. Lengths are saved to measurements.csv with the results.</div>
+        <div class="stat-row"><span>Points on image</span><strong id="point-count">0</strong></div>
+        <button type="button" class="btn block" id="save-annotated" title="Saves a PNG copy with your marks into an 'annotated' sub-folder. The original is never changed.">Save annotated copy</button>
+      </div>
+
+      <div class="panel-block">
+        <div class="block-title">Image adjustments</div>
+        <label class="slider-row" for="brightness">
+          <span>Brightness</span><output id="brightness-val">100%</output>
+        </label>
+        <input id="brightness" type="range" min="20" max="300" step="5" value="100">
+        <label class="slider-row" for="contrast">
+          <span>Contrast</span><output id="contrast-val">100%</output>
+        </label>
+        <input id="contrast" type="range" min="20" max="300" step="5" value="100">
+        <button type="button" class="btn ghost sm" id="adjust-reset">Reset</button>
+        <span class="muted small">Kept for the next images.</span>
+      </div>
+
+      <div class="panel-block small muted keys">
+        <div><kbd>Enter</kbd> save age &amp; next</div>
+        <div><kbd>Esc</kbd> leave the age box (to use shortcuts)</div>
+        <div><kbd>H</kbd> <kbd>F</kbd> <kbd>L</kbd> <kbd>P</kbd> <kbd>S</kbd> tools · <kbd>0</kbd> fit</div>
+        <div><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo · <kbd>Ctrl</kbd>+<kbd>S</kbd> save results</div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<!-- ============ END OF ROUND ============ -->
+<div id="done-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="done-title">
+  <div class="dialog">
+    <h2 id="done-title">End of the images</h2>
+    <p id="done-summary"></p>
+    <div class="dialog-actions">
+      <button id="review-skipped" class="btn">Review skipped images</button>
+      <button id="done-save" class="btn primary">Save results</button>
+      <button id="done-back" class="btn ghost">Back to last image</button>
+      <button id="done-exit" class="btn ghost">Finish</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SET SCALE ============ -->
+<div id="scale-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="scale-title">
+  <form class="dialog" id="scale-form" autocomplete="off">
+    <h2 id="scale-title">Set scale</h2>
+    <p>The line you drew is <strong id="scale-px">0 px</strong> long. How long is it in reality?</p>
+    <div class="inline-form">
+      <input id="scale-length" type="text" inputmode="decimal" placeholder="e.g. 1" maxlength="12" class="scale-input">
+      <select id="scale-unit">
+        <option value="mm">mm</option>
+        <option value="µm">µm</option>
+        <option value="cm">cm</option>
+      </select>
+    </div>
+    <div class="field-msg" id="scale-msg"></div>
+    <fieldset class="scale-apply">
+      <legend>Use this scale for</legend>
+      <label><input type="radio" name="scale-apply" value="folder" checked> All images in this folder <span class="muted small">(replaces the current folder scale)</span></label>
+      <label><input type="radio" name="scale-apply" value="image"> This image only</label>
+    </fieldset>
+    <div class="dialog-actions">
+      <button type="submit" class="btn primary">Set scale</button>
+      <button type="button" class="btn ghost" id="scale-cancel">Cancel</button>
+    </div>
+  </form>
+</div>
+
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+<script src="csv.js"></script>
+<script src="viewer.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
